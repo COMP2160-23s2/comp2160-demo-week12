@@ -4,6 +4,8 @@ using UnityEngine;
 
 public class Move : MonoBehaviour
 {
+    private const float tolerance = 0.01f;
+
     [SerializeField]
     private float speed = 5;
 
@@ -13,11 +15,14 @@ public class Move : MonoBehaviour
     [SerializeField]
     private Map map;
 
+    [SerializeField]
+    private SpriteRenderer sprite;
+
     void Update()
     {
         if (Input.GetMouseButtonDown(0))
         {
-            SetPath();
+            RequestPath();
         }
 
         if (path != null && path.Count > 0)
@@ -29,7 +34,7 @@ public class Move : MonoBehaviour
         }  
     }
 
-    private void SetPath()
+    private void RequestPath()
     {
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
         Vector3Int? p = map.Raycast(ray);
@@ -37,8 +42,13 @@ public class Move : MonoBehaviour
         {
             Vector3Int src = Vector3Int.FloorToInt(transform.position);
             Vector3Int dest = p.Value;
-            path = map.Path(src, dest);
+            map.RequestPath(this, src, dest);
         }
+    }
+
+    public void SetPath(List<Vector3Int> path)
+    {
+        this.path = path;
     }
 
     private bool MoveTo(Vector3Int pos)
@@ -47,13 +57,18 @@ public class Move : MonoBehaviour
         if (!map.CanMove(src, pos - src))
         {
             // blocked
+            sprite.color = Color.red;
             return false;
+        }
+        else {
+            sprite.color = Color.green;
         }
 
         Vector3 dir = pos - transform.position;
-        Vector3 move = dir.normalized * speed * Time.deltaTime;
+        Vector3 move = dir.normalized;
+        move = move * speed * Time.deltaTime;
 
-        if (dir.magnitude == 0 || move.magnitude > dir.magnitude)
+        if (dir.magnitude < tolerance || move.magnitude > dir.magnitude)
         {
             // reached the destination
             transform.position = pos;
@@ -68,19 +83,7 @@ public class Move : MonoBehaviour
 
     void OnDrawGizmos()
     {
-        if (path == null || path.Count < 2)
-        {
-            return;
-        }
-
-        Gizmos.color = Color.magenta;
-        Vector3 offset = new Vector3(0.5f, 0.5f, 0);
-        Vector3 p0 = path[0] + offset;
-        for (int i = 1; i < path.Count; i++)
-        {
-            Vector3 p1 = path[i] + offset;
-            Gizmos.DrawLine(p0, p1);
-            p0 = p1;
-        }
+        Gizmos.color = Color.green;
+        map.DrawPathGizmo(path);
     }
 }

@@ -3,65 +3,136 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using Priority_Queue;
 
 public class Map : MonoBehaviour
 {
+    private Vector3 offset = new Vector3(0.5f, 0.5f, 0);
+
     [SerializeField]
     private Tilemap tilemap;
 
-    public List<Vector3Int> Path(Vector3Int src, Vector3Int dest)
+    private IEnumerator coroutine;
+
+    private List<Vector3Int> path;
+
+    private SimplePriorityQueue<List<Vector3Int>> incomplete;
+
+    private HashSet<Vector3Int> explored;
+
+    private Vector3Int? destination = null;
+
+    public void RequestPath(Move requester, Vector3Int src, Vector3Int dest)
     {
-        // simple path planner with no obstacle avoidance
-        
+        if (coroutine != null)
+        {
+            // kill the last request
+            StopCoroutine(coroutine);
+        }
+
+        coroutine = Path(requester, src, dest);
+        StartCoroutine(coroutine);
+    }
+
+    private IEnumerator Path(Move requester, Vector3Int src, Vector3Int dest)
+    {       
+        destination = dest;
+
         if (IsOccupied(dest))
         {
-            return null;
+            requester.SetPath(null);
+            coroutine = null;
+            yield break;
         }
 
-        List<Vector3Int> path = new List<Vector3Int>();
+        path = new List<Vector3Int>();
         path.Add(src);
 
-        Vector3Int dist = dest - src;
-        Vector3Int dir = Vector3Int.zero;
-        dir.x = Math.Sign(dist.x);
-        dir.y = Math.Sign(dist.y);
-        dist.x = Math.Abs(dist.x);
-        dist.y = Math.Abs(dist.y);
+        // the set of explored locations (do not revisit)
+        explored = new HashSet<Vector3Int>();
 
-        Vector3Int p = src;
-        while (dist.x > 0 || dist.y > 0)
+        // the collection of incomplete path
+        incomplete = new SimplePriorityQueue<List<Vector3Int>>();
+        incomplete.Enqueue(path, Cost(path) + Distance(src, dest));
+
+        while (incomplete.Count > 0)
         {
-            if (dist.x > dist.y)
-            {
-                // take one step in the x direction
-                p.x += dir.x;
-                dist.x--;
-            }
-            else if (dist.x < dist.y)
-            {
-                // take one step in the y direction
-                p.y += dir.y;
-                dist.y--;
-            }
-            else {
-                // take one step along the diagonal
-                p.x += dir.x;
-                p.y += dir.y;
-                dist.x--;
-                dist.y--;
+            yield return null;
+
+            path = incomplete.Dequeue();
+            Vector3Int last = path[path.Count -1];
+            if (last == dest)
+            {                
+                // reached the goal, return the path
+                requester.SetPath(path);
+                coroutine = null;
+                yield break;
             }
 
-            path.Add(p);
+            if (!explored.Contains(last))
+            {
+                explored.Add(last);
+
+                // generate all possible extensions
+                List<List<Vector3Int>> extensions = Extend(path);
+                foreach (List<Vector3Int> extended in extensions) {
+                    // add new extensions to the queue.
+                    last = extended[extended.Count -1];
+                    float cost = Cost(extended);
+                    float distance = Distance(last, dest);
+                    incomplete.Enqueue(extended, cost + distance);
+                }
+            }
         }
-        return path;
+
+        // no path could be found
+        requester.SetPath(null);
+        coroutine = null;
+        yield break;
     }
 
+    private List<List<Vector3Int>> Extend(List<Vector3Int> path)
+    {
+        List<List<Vector3Int>> extensions = new List<List<Vector3Int>>();
 
-    public List<Vector3Int> Path(Vector3 src, Vector3 dest)
-    {        
-        return Path(Vector3Int.FloorToInt(src),
-            Vector3Int.FloorToInt(dest));
+        // extend the path to all the neighbouring cells if possible
+        Vector3Int last = path[path.Count -1];
+        Vector3Int step = Vector3Int.zero;
+        for (step.x = -1; step.x <= 1; step.x++)
+        {
+            for (step.y = -1; step.y <= 1; step.y++)
+            {
+                if (step != Vector3Int.zero && CanMove(last, step))
+                {
+                    // copy the path and add the extra step
+                    List<Vector3Int> extended = new List<Vector3Int>(path);
+                    extended.Add(last + step);
+                    extensions.Add(extended);
+                }
+            }
+        }
+
+        return extensions;
     }
+
+    private float Cost(List<Vector3Int> path)
+    {
+        float length = 0;
+
+        for (int i = 1; i < path.Count; i++)
+        {
+            Vector3Int step = path[i] - path[i-1];
+            length += step.magnitude;
+        }
+
+        return length;
+    }
+
+    private float Distance(Vector3Int src, Vector3Int dest)
+    {
+        return Vector3Int.Distance(src, dest);
+    }
+
 
     public bool IsOccupied(Vector3Int p)
     {
@@ -109,6 +180,51 @@ public class Map : MonoBehaviour
         else 
         {
             return null;
+        }
+    }
+
+
+    void OnDrawGizmos()
+    {
+        if (destination.HasValue)
+        {
+            Gizmos.color = Color.red;
+            Gizmos.DrawSphere(destination.Value + offset, 0.1f);
+        }
+
+        if (explored != null)
+        {
+            Gizmos.color = Color.black;
+            foreach (Vector3Int p in explored)
+            {
+                Gizmos.DrawSphere(p + offset, 0.1f);
+            }            
+        }
+
+        if (incomplete != null)
+        {
+            Gizmos.color = Color.black;
+            foreach (List<Vector3Int> incompletePath in incomplete)
+            {
+                DrawPathGizmo(incompletePath);            
+            }
+        }
+
+        Gizmos.color = Color.red;
+        DrawPathGizmo(path);
+    }
+
+    public void DrawPathGizmo(List<Vector3Int> path)
+    {
+        if (path != null && path.Count > 0) 
+        {
+            Vector3 p0 = path[0] + offset;
+            for (int i = 1; i < path.Count; i++)
+            {
+                Vector3 p1 = path[i] + offset;
+                Gizmos.DrawLine(p0, p1);
+                p0 = p1;
+            }
         }
     }
 }
