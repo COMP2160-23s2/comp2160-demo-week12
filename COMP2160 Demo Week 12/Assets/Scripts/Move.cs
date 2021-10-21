@@ -10,13 +10,16 @@ public class Move : MonoBehaviour
     [SerializeField]
     private List<Vector3Int> path;
 
-    void Start()
-    {
-        
-    }
+    [SerializeField]
+    private Map map;
 
     void Update()
     {
+        if (Input.GetMouseButtonDown(0))
+        {
+            SetPath();
+        }
+
         if (path != null && path.Count > 0)
         {
             if (MoveTo(path[0]))
@@ -24,6 +27,18 @@ public class Move : MonoBehaviour
                 path.RemoveAt(0);
             }
         }  
+    }
+
+    private void SetPath()
+    {
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        Vector3Int? p = map.Raycast(ray);
+        if (p.HasValue)
+        {
+            Vector3Int src = Vector3Int.FloorToInt(transform.position);
+            Vector3Int dest = p.Value;
+            path = map.Path(src, dest);
+        }
     }
 
     private bool MoveTo(Vector3Int pos)

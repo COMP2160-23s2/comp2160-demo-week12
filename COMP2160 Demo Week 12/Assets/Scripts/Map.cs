@@ -73,5 +73,20 @@ public class Map : MonoBehaviour
         return IsOccupied(Vector3Int.FloorToInt(p));
     }
 
-
+    public Vector3Int? Raycast(Ray ray)
+    {
+        Plane plane = new Plane(transform.forward, transform.position);
+        float t;
+        if (plane.Raycast(ray, out t))
+        {
+            // get the collision point in the local coorindate system of the map
+            Vector3 p = ray.GetPoint(t);
+            p = transform.InverseTransformPoint(p);
+            return Vector3Int.FloorToInt(p);
+        }
+        else 
+        {
+            return null;
+        }
+    }
 }
