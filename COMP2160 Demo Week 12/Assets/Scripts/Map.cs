@@ -130,7 +130,13 @@ public class Map : MonoBehaviour
 
     private float Distance(Vector3Int src, Vector3Int dest)
     {
-        return Vector3Int.Distance(src, dest);
+        // return Vector3Int.Distance(src, dest);
+        Vector3Int d = dest - src;
+        d.x = Math.Abs(d.x);
+        d.y = Math.Abs(d.y);
+        float max = Math.Max(d.x, d.y);
+        float min = Math.Min(d.x, d.y);
+        return min * Mathf.Sqrt(2) + (max - min);
     }
 
 
