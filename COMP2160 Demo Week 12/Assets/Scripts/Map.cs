@@ -73,6 +73,28 @@ public class Map : MonoBehaviour
         return IsOccupied(Vector3Int.FloorToInt(p));
     }
 
+    public bool CanMove(Vector3Int src, Vector3Int step)
+    {
+        if (IsOccupied(src + step)) 
+        {
+            return false;
+        }
+
+        // for diagonal movements, check the horizontal and vertical neighbours too
+        if (step.x != 0 && step.y != 0)
+        {
+            if (IsOccupied(src + Vector3Int.right * step.x))
+            {
+                return false;
+            }
+            if (IsOccupied(src + Vector3Int.up * step.y))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     public Vector3Int? Raycast(Ray ray)
     {
         Plane plane = new Plane(transform.forward, transform.position);

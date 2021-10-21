@@ -43,6 +43,13 @@ public class Move : MonoBehaviour
 
     private bool MoveTo(Vector3Int pos)
     {
+        Vector3Int src = Vector3Int.FloorToInt(transform.position);
+        if (!map.CanMove(src, pos - src))
+        {
+            // blocked
+            return false;
+        }
+
         Vector3 dir = pos - transform.position;
         Vector3 move = dir.normalized * speed * Time.deltaTime;
 
