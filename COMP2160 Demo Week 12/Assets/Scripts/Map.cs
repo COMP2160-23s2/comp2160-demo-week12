@@ -1,11 +1,13 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 public class Map : MonoBehaviour
 {
     [SerializeField]
-    private TileMap tileMap;
+    private Tilemap tilemap;
 
     public List<Vector3Int> Path(Vector3Int src, Vector3Int dest)
     {
@@ -20,7 +22,7 @@ public class Map : MonoBehaviour
         path.Add(src);
 
         Vector3Int dist = dest - src;
-        Vector3Int dir;
+        Vector3Int dir = Vector3Int.zero;
         dir.x = Math.Sign(dist.x);
         dir.y = Math.Sign(dist.y);
         dist.x = Math.Abs(dist.x);
@@ -38,7 +40,7 @@ public class Map : MonoBehaviour
             else if (dist.x < dist.y)
             {
                 // take one step in the y direction
-                p.y += dir.sy;
+                p.y += dir.y;
                 dist.y--;
             }
             else {
@@ -63,7 +65,7 @@ public class Map : MonoBehaviour
 
     public bool IsOccupied(Vector3Int p)
     {
-        return tileMap.GetColliderType(p) != ColliderType.None;
+        return tilemap.GetColliderType(p) != Tile.ColliderType.None;
     }
 
     public bool IsOccupied(Vector3 p)
