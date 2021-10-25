@@ -40,6 +40,8 @@ public class Move : MonoBehaviour
         Vector3Int? p = map.Raycast(ray);
         if (p.HasValue)
         {
+            // cancel the current path and request a new one
+            this.path = null;
             Vector3Int src = Vector3Int.FloorToInt(transform.position);
             Vector3Int dest = p.Value;
             map.RequestPath(this, src, dest);
@@ -81,9 +83,4 @@ public class Move : MonoBehaviour
         }
     }
 
-    void OnDrawGizmos()
-    {
-        Gizmos.color = Color.green;
-        map.DrawPathGizmo(path);
-    }
 }

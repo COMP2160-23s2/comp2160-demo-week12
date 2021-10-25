@@ -3,7 +3,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
-using Priority_Queue;
 
 public class Map : MonoBehaviour
 {
@@ -16,20 +15,30 @@ public class Map : MonoBehaviour
 
     private List<Vector3Int> path;
 
-    private SimplePriorityQueue<List<Vector3Int>> incomplete;
+    private Queue<List<Vector3Int>> incomplete;
 
     private HashSet<Vector3Int> explored;
 
     private Vector3Int? destination = null;
 
+    /**
+     * Place a request for a path from src to dest.
+     * This will run as a coroutine and called requestor.SetPath() 
+     * when done.
+     *
+     * Note: for simplicity's sake, we only allow one request at
+     * a time. If a new request is made, the old one is cancelled
+     */
+
     public void RequestPath(Move requester, Vector3Int src, Vector3Int dest)
     {
         if (coroutine != null)
         {
-            // kill the last request
+            // if a another request is already running, kill it
             StopCoroutine(coroutine);
         }
 
+        // start a new coroutine to generate a path
         coroutine = Path(requester, src, dest);
         StartCoroutine(coroutine);
     }
@@ -38,27 +47,27 @@ public class Map : MonoBehaviour
     {       
         destination = dest;
 
-        if (IsOccupied(dest))
-        {
-            requester.SetPath(null);
-            coroutine = null;
-            yield break;
-        }
-
+        // start with the path: [src]
         path = new List<Vector3Int>();
         path.Add(src);
 
         // the set of explored locations (do not revisit)
         explored = new HashSet<Vector3Int>();
 
-        // the collection of incomplete path
-        incomplete = new SimplePriorityQueue<List<Vector3Int>>();
-        incomplete.Enqueue(path, Cost(path) + Distance(src, dest));
+        // the collection of incomplete paths
+        // sorting the set as a FIFO queue means search will
+        // be done in breadth-first order
+        incomplete = new Queue<List<Vector3Int>>();
+        incomplete.Enqueue(path);
 
+        // Keep going until we run out of new paths to try
         while (incomplete.Count > 0)
         {
+            // yield to wait a frame
             yield return null;
 
+            // take the first path from the queue and see if it is complete
+            // if so, return it
             path = incomplete.Dequeue();
             Vector3Int last = path[path.Count -1];
             if (last == dest)
@@ -69,18 +78,18 @@ public class Map : MonoBehaviour
                 yield break;
             }
 
+            // if the last location in the path has already been explored
+            // then we don't need to expand it.
             if (!explored.Contains(last))
             {
+                // mark this location as explored
                 explored.Add(last);
 
                 // generate all possible extensions
                 List<List<Vector3Int>> extensions = Extend(path);
                 foreach (List<Vector3Int> extended in extensions) {
                     // add new extensions to the queue.
-                    last = extended[extended.Count -1];
-                    float cost = Cost(extended);
-                    float distance = Distance(last, dest);
-                    incomplete.Enqueue(extended, cost + distance);
+                    incomplete.Enqueue(extended);
                 }
             }
         }
@@ -93,9 +102,10 @@ public class Map : MonoBehaviour
 
     private List<List<Vector3Int>> Extend(List<Vector3Int> path)
     {
+        // generate all possible extensions of the given path
         List<List<Vector3Int>> extensions = new List<List<Vector3Int>>();
 
-        // extend the path to all the neighbouring cells if possible
+        // extend the path to all the eight neighbouring cells if possible
         Vector3Int last = path[path.Count -1];
         Vector3Int step = Vector3Int.zero;
         for (step.x = -1; step.x <= 1; step.x++)
@@ -114,31 +124,6 @@ public class Map : MonoBehaviour
 
         return extensions;
     }
-
-    private float Cost(List<Vector3Int> path)
-    {
-        float length = 0;
-
-        for (int i = 1; i < path.Count; i++)
-        {
-            Vector3Int step = path[i] - path[i-1];
-            length += step.magnitude;
-        }
-
-        return length;
-    }
-
-    private float Distance(Vector3Int src, Vector3Int dest)
-    {
-        // return Vector3Int.Distance(src, dest);
-        Vector3Int d = dest - src;
-        d.x = Math.Abs(d.x);
-        d.y = Math.Abs(d.y);
-        float max = Math.Max(d.x, d.y);
-        float min = Math.Min(d.x, d.y);
-        return min * Mathf.Sqrt(2) + (max - min);
-    }
-
 
     public bool IsOccupied(Vector3Int p)
     {
@@ -172,6 +157,9 @@ public class Map : MonoBehaviour
         return true;
     }
 
+    /**
+     * Do a raycast to see which cell location the player has clicked on.
+     */
     public Vector3Int? Raycast(Ray ray)
     {
         Plane plane = new Plane(transform.forward, transform.position);
@@ -192,12 +180,14 @@ public class Map : MonoBehaviour
 
     void OnDrawGizmos()
     {
+        // highlight the destination
         if (destination.HasValue)
         {
             Gizmos.color = Color.red;
             Gizmos.DrawSphere(destination.Value + offset, 0.1f);
         }
 
+        // add a dot to every location that has been explored
         if (explored != null)
         {
             Gizmos.color = Color.black;
@@ -207,6 +197,7 @@ public class Map : MonoBehaviour
             }            
         }
 
+        // draw all the incomplete paths
         if (incomplete != null)
         {
             Gizmos.color = Color.black;
@@ -216,6 +207,7 @@ public class Map : MonoBehaviour
             }
         }
 
+        // draw the final path
         Gizmos.color = Color.red;
         DrawPathGizmo(path);
     }
