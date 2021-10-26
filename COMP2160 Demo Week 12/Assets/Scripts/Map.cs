@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using Priority_Queue;
 
 public class Map : MonoBehaviour
 {
@@ -15,7 +16,7 @@ public class Map : MonoBehaviour
 
     private List<Vector3Int> path;
 
-    private Queue<List<Vector3Int>> incomplete;
+    private SimplePriorityQueue<List<Vector3Int>> incomplete;
 
     private HashSet<Vector3Int> explored;
 
@@ -41,6 +42,7 @@ public class Map : MonoBehaviour
         // start a new coroutine to generate a path
         coroutine = Path(requester, src, dest);
         StartCoroutine(coroutine);
+        Debug.Break();
     }
 
     private IEnumerator Path(Move requester, Vector3Int src, Vector3Int dest)
@@ -57,8 +59,9 @@ public class Map : MonoBehaviour
         // the collection of incomplete paths
         // sorting the set as a FIFO queue means search will
         // be done in breadth-first order
-        incomplete = new Queue<List<Vector3Int>>();
-        incomplete.Enqueue(path);
+        incomplete = new SimplePriorityQueue<List<Vector3Int>>();
+        float priority = 0;
+        incomplete.Enqueue(path, priority);
 
         // Keep going until we run out of new paths to try
         while (incomplete.Count > 0)
@@ -89,7 +92,9 @@ public class Map : MonoBehaviour
                 List<List<Vector3Int>> extensions = Extend(path);
                 foreach (List<Vector3Int> extended in extensions) {
                     // add new extensions to the queue.
-                    incomplete.Enqueue(extended);
+                    last = extended[extended.Count - 1];
+                    priority = Length(extended) + Distance(last, dest);
+                    incomplete.Enqueue(extended, priority);
                 }
             }
         }
@@ -124,6 +129,33 @@ public class Map : MonoBehaviour
 
         return extensions;
     }
+
+
+    private float Distance(Vector3Int src, Vector3Int dest)
+    {
+        // return Vector3Int.Distance(src, dest);
+        Vector3Int d = dest - src;
+        d.x = Math.Abs(d.x);
+        d.y = Math.Abs(d.y);
+
+        int max = Math.Max(d.x, d.y);
+        int min = Math.Min(d.x, d.y);
+
+        return (max - min) + Mathf.Sqrt(2) * min;
+    }
+
+    private float Length(List<Vector3Int> path)
+    {
+        float length = 0;
+
+        for (int i = 1; i < path.Count; i++)
+        {
+            length += Vector3Int.Distance(path[i-1], path[i]);
+        }
+
+        return length;
+    }
+
 
     public bool IsOccupied(Vector3Int p)
     {
