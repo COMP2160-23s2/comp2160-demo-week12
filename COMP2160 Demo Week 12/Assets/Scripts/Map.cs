@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 using Priority_Queue;
@@ -93,6 +94,10 @@ public class Map : MonoBehaviour
                 foreach (List<Vector3Int> extended in extensions) {
                     // add new extensions to the queue.
                     last = extended[extended.Count - 1];
+                    // h = f + g
+                    // h = heuristic expected final path length
+                    // f = path length so far
+                    // g = heuristic predicted distance to goal (optimistic)
                     priority = Length(extended) + Distance(last, dest);
                     incomplete.Enqueue(extended, priority);
                 }
@@ -130,18 +135,26 @@ public class Map : MonoBehaviour
         return extensions;
     }
 
+    // Set:
+    // Length = 0, Distance = 0 -> Breadth first search
+    // Length = L, Distance = 0 -> Shortest path first
+    // Length = 0, Distance = D -> Greedy path to goal
+    // Length = L, Distance = D -> Shortest path to goal (full A*)
 
     private float Distance(Vector3Int src, Vector3Int dest)
     {
-        // return Vector3Int.Distance(src, dest);
+        float distance = 0;
+        // distance = Vector3Int.Distance(src, dest);
+
         Vector3Int d = dest - src;
         d.x = Math.Abs(d.x);
         d.y = Math.Abs(d.y);
 
         int max = Math.Max(d.x, d.y);
         int min = Math.Min(d.x, d.y);
+        distance = (max - min) + Mathf.Sqrt(2) * min;
 
-        return (max - min) + Mathf.Sqrt(2) * min;
+        return distance;
     }
 
     private float Length(List<Vector3Int> path)
@@ -232,19 +245,17 @@ public class Map : MonoBehaviour
         // draw all the incomplete paths
         if (incomplete != null)
         {
-            Gizmos.color = Color.black;
             foreach (List<Vector3Int> incompletePath in incomplete)
             {
-                DrawPathGizmo(incompletePath);            
+                DrawPathGizmo(incompletePath, Color.black, 3);            
             }
         }
 
         // draw the final path
-        Gizmos.color = Color.red;
-        DrawPathGizmo(path);
+        DrawPathGizmo(path, Color.red, 5);
     }
 
-    public void DrawPathGizmo(List<Vector3Int> path)
+    public void DrawPathGizmo(List<Vector3Int> path, Color color, int thickness)
     {
         if (path != null && path.Count > 0) 
         {
@@ -252,7 +263,9 @@ public class Map : MonoBehaviour
             for (int i = 1; i < path.Count; i++)
             {
                 Vector3 p1 = path[i] + offset;
-                Gizmos.DrawLine(p0, p1);
+//                Gizmos.DrawLine(p0, p1);
+                // draw thicker lines
+                Handles.DrawBezier(p0, p1, p0, p1, color, null, thickness);
                 p0 = p1;
             }
         }
